@@ -1,0 +1,26 @@
+{
+  "name": "nem2-crosschain-api",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "azure-storage": "^2.10.1",
+    "nem2-sdk": "^0.10.1"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^1.0.14"
+  },
+  "scripts": {
+    
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/planethouki/nem2-crosschain-api.git"
+  },
+  "author": "planethouki",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/planethouki/nem2-crosschain-api/issues"
+  },
+  "homepage": "https://github.com/planethouki/nem2-crosschain-api#readme"
+}
