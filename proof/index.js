@@ -51,40 +51,25 @@ module.exports = function (context, req) {
             })
         })
     }
-    const checkCosign = (tx1pubHash) => {
+    const getTxStatus = (tx1pubHash) => {
         return new Promise((resolve, reject) => {
             pubChain.transactionHttp.getTransactionStatus(tx1pubHash).subscribe(x => resolve(x))
         })
     }
 
-    const createTxs = (secret, proof) =>{
+    const sendProofTx = (secret, proof, account, transactionHttp) => {
         return new Promise((resolve, reject) => {
-            const tx2pub = nem.SecretProofTransaction.create(
+            const tx2 = nem.SecretProofTransaction.create(
                 nem.Deadline.create(),
                 nem.HashType.SHA3_512,
                 secret,
                 proof,
                 NETWORK_TYPE
             );
-            const signedTx2pub = pubHostAccount.sign(tx2pub)
-
-            const tx2priv = nem.SecretProofTransaction.create(
-                nem.Deadline.create(),
-                nem.HashType.SHA3_512,
-                secret,
-                proof,
-                NETWORK_TYPE
-            );
-            const signedTx2priv = privHostAccount.sign(tx2priv)
-            resolve({"signedTx2pub": signedTx2pub, "signedTx2priv": signedTx2priv})
-        })
-    }
-    
-    const announceTx = (tx, transactionHttp) => {
-        return new Promise((resolve, reject) => {
-            transactionHttp.announce(tx).subscribe(
-                x => resolve(x),
-                err => reject(err)
+            const signedTx2 = account.sign(tx2)
+            transactionHttp.announce(signedTx2).subscribe(
+                x => resolve({ "TransactionAnnounceResponse": x, "hash": signedTx2.hash }),
+                err => reject({ "error": err, "hash": signedTx2.hash })
             )
         })
     }
@@ -92,7 +77,7 @@ module.exports = function (context, req) {
     const exec = async (secret) => {
         const data = await getDataFromBlob(secret)
         context.log("checking tx1pub cosigned: " + data.tx1pubHash)
-        const tx1pubStatus = await checkCosign(data.tx1pubHash)
+        const tx1pubStatus = await getTxStatus(data.tx1pubHash)
         if (tx1pubStatus.group !== "confirmed") {
             context.log("tx1pub has not cosigned yet")
             context.res = {
@@ -102,12 +87,11 @@ module.exports = function (context, req) {
             context.done();
             return;
         }
-        context.log("create secret proof tx")
-        const txs = await createTxs(secret, data.proof)
-        context.log("announce txs")
-        const announcePub = announceTx(txs.signedTx2pub, pubChain.transactionHttp)
-        const announcePriv = announceTx(txs.signedTx2priv, privChain.transactionHttp)
-        [await announcePub, await announcePriv].map(context.log)
+        const sendProofTxPub = sendProofTx(secret, data.proof, pubHostAccount, pubChain.transactionHttp)
+        const sendProofTxPriv = sendProofTx(secret, data.proof, privHostAccount, privChain.transactionHttp)
+        await sendProofTxPub.then(context.log)
+        await sendProofTxPriv.then(context.log)
+        
         context.res = {
             status: 200,
             body: "OK"
