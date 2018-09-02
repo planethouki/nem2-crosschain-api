@@ -15,21 +15,22 @@ module.exports = function (context, req) {
     const privHostAccount = nem.Account.createFromPrivateKey(process.env.HOST_PRIVATEKEY_PRIVATE, NETWORK_TYPE)
     const pubHostAccount = nem.Account.createFromPrivateKey(process.env.HOST_PRIVATEKEY_PUBLIC, NETWORK_TYPE)
 
-    if (req.body && req.body.send && req.body.recieve && req.body.amount) {
+    if (req.body && req.body.send && req.body.receive && req.body.amount && req.body.pubkey) {
         context.log("sender: " + req.body.send)
-        context.log("recipient: " + req.body.recieve)
+        context.log("recipient: " + req.body.receive)
         context.log("amount: " + req.body.amount)
         context.log("pubkey: " + req.body.pubkey)
     } else {
+        context.log.error(req.body ? req.body : "req.body not found");
         context.res = {
             status: 400,
-            body: "Please pass send, recieve, amount and pubkey in the request body"
+            body: "Please pass send, receive, amount and pubkey in the request body"
         };
         context.done();
         return;
     }
     
-    const privRecipient = nem.Address.createFromRawAddress(req.body.recieve)
+    const privRecipient = nem.Address.createFromRawAddress(req.body.receive)
     const pubSender = nem.Address.createFromRawAddress(req.body.send)
     const amount = req.body.amount
     const pubSenderPublicAccount = nem.PublicAccount.createFromPublicKey(req.body.pubkey)
