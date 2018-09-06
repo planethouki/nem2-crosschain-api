@@ -1,11 +1,6 @@
 module.exports = function (context, req) {
     context.log('JavaScript HTTP trigger function processed a request.');
     const nem = require("nem2-sdk")
-    const crypto = require("crypto")
-    const jssha3 = require('js-sha3')
-    const sha3_512 = jssha3.sha3_512
-    const rx = require('rxjs')
-    const op = require('rxjs/operators')
 
     const NETWORK_TYPE = nem.NetworkType.MIJIN_TEST
 
@@ -51,50 +46,75 @@ module.exports = function (context, req) {
             })
         })
     }
-    const getTxStatus = (tx1pubHash) => {
+    const getTxPubStatus = (txpubHash) => {
         return new Promise((resolve, reject) => {
-            pubChain.transactionHttp.getTransactionStatus(tx1pubHash).subscribe(x => resolve(x))
+            pubChain.transactionHttp.getTransactionStatus(txpubHash).subscribe(
+                x => resolve(x),
+                err => reject(err)
+            )
         })
     }
 
     const sendProofTx = (secret, proof, account, transactionHttp) => {
         return new Promise((resolve, reject) => {
-            const tx2 = nem.SecretProofTransaction.create(
+            const tx = nem.SecretProofTransaction.create(
                 nem.Deadline.create(),
                 nem.HashType.SHA3_512,
                 secret,
                 proof,
                 NETWORK_TYPE
             );
-            const signedTx2 = account.sign(tx2)
-            transactionHttp.announce(signedTx2).subscribe(
-                x => resolve({ "TransactionAnnounceResponse": x, "hash": signedTx2.hash }),
-                err => reject({ "error": err, "hash": signedTx2.hash })
+            const signedTx = account.sign(tx)
+            transactionHttp.announce(signedTx).subscribe(
+                x => resolve({ "TransactionAnnounceResponse": x, "hash": signedTx.hash }),
+                err => reject({ "error": err, "hash": signedTx.hash })
             )
         })
     }
 
     const exec = async (secret) => {
         const data = await getDataFromBlob(secret)
-        context.log("checking tx1pub cosigned: " + data.tx1pubHash)
-        const tx1pubStatus = await getTxStatus(data.tx1pubHash)
-        if (tx1pubStatus.group !== "confirmed") {
+        context.log("checking tx2pub cosigned: " + data.tx2pubHash)
+        const tx2pubStatus = await getTxPubStatus(data.tx2pubHash).catch((e) => {
             context.log("tx1pub has not cosigned yet")
             context.res = {
                 status: 400,
-                body: "tx not confirmed"
+                body: {
+                    message: "tx not confirmed",
+                    tx2pubHash: data.tx2pubHash
+                }
+            };
+            context.done();
+            return;
+        })
+        context.log("tx2pub status: " + tx2pubStatus.group)
+        if (tx2pubStatus.group !== "confirmed") {
+            context.log("tx1pub has not cosigned yet")
+            context.res = {
+                status: 400,
+                body: {
+                    message: "tx not confirmed",
+                    tx2pubHash: data.tx2pubHash
+                }
             };
             context.done();
             return;
         }
         const sendProofTxPub = sendProofTx(secret, data.proof, pubHostAccount, pubChain.transactionHttp)
         const sendProofTxPriv = sendProofTx(secret, data.proof, privHostAccount, privChain.transactionHttp)
-        await sendProofTxPub.then(context.log)
-        await sendProofTxPriv.then(context.log)
+
+        const resultTx3pub = await sendProofTxPub
+        const resultTx4priv = await sendProofTxPriv
+
+        context.log(resultTx3pub)
+        context.log(resultTx4priv)
         
         context.res = {
             status: 200,
-            body: "OK"
+            body: { 
+                tx3pubHash: resultTx3pub.hash,
+                tx4privHash: resultTx4priv.hash
+            }
         };
         context.done();
         return;
@@ -107,7 +127,9 @@ module.exports = function (context, req) {
     if (!(req.body && req.body.secret)) {
         context.res = {
             status: 400,
-            body: "Please pass secret in the request body"
+            body: {
+                message: "Please pass secret in the request body"
+            }
         };
         context.done();
         return;

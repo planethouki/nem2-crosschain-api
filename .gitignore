@@ -26,4 +26,4 @@ local.settings.json
 
 /HttpTriggerJS
 /blobread
-/cosign
+/DepositCosign
