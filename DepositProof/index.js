@@ -113,7 +113,8 @@ module.exports = function (context, req) {
             status: 200,
             body: { 
                 tx3pubHash: resultTx3pub.hash,
-                tx4privHash: resultTx4priv.hash
+                tx4privHash: resultTx4priv.hash,
+                proof: data.proof
             }
         };
         context.done();
